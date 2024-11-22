@@ -36,6 +36,8 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.cronet.embedded)
+    implementation(libs.jackson.base)
+    implementation(libs.jackson.databind)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

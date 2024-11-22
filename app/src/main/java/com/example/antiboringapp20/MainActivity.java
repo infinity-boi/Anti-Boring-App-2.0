@@ -2,6 +2,7 @@ package com.example.antiboringapp20;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -23,14 +24,19 @@ import androidx.appcompat.widget.SwitchCompat;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
@@ -44,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private static TextView poph;
     private static TextView pop;
     private Handler mainHandler;
+    AssetManager assetManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState){
@@ -69,7 +76,7 @@ public class MainActivity extends AppCompatActivity {
         final PopupWindow popupWindow = new PopupWindow(popupView, width, height, true);
 
         mainHandler = new Handler(Looper.getMainLooper());
-
+        assetManager = this.getAssets();
         taskButton.setOnClickListener(view -> {
             fetchDataFromApi();
             vib.vibrate(80);
@@ -79,6 +86,7 @@ public class MainActivity extends AppCompatActivity {
             if(switchState){
 //                popupWindow.showAtLocation(view, Gravity.CENTER, 0, 0);
 //                fetchHowto();
+                Log.d(TAG, "AI is currently in the development phase.");
             }
             else {
                 Uri uriUrl = Uri.parse("https://www.google.com/search?q=" + "How to " + activity);
@@ -89,11 +97,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class FetchDataTask extends AsyncTask<Void, Void, String> {
+        protected String fetchFromJson() throws IOException {
+            InputStream jsonFile = assetManager.open("activities.json");
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.readTree(jsonFile);
+            jsonFile.close();
+            int min = 0;
+            int max = rootNode.size();
+            System.out.println(max);
+            int randn = ThreadLocalRandom.current().nextInt(min, max);
+            JsonNode selectedNode = rootNode.get(String.valueOf(randn));
+            if (selectedNode != null) {
+                return selectedNode.toString();
+            } else {
+                throw new IOException("Selected JSON node is null");
+            }
+        }
+
         @Override
         protected String doInBackground(Void... voids) {
-            String responseBody = "";
+            String responseBody = null;
+            try {
+                System.out.println("Fetching Data from Json");
+                responseBody = fetchFromJson();
+                System.out.println("Response from JSON : " + responseBody);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
             HttpURLConnection connection = null;
-            System.out.println("Fetching Data from BoredAPI");
+            System.out.println("Fetching Data from API");
             try {
                 String apiUrl2 = "https://bored-api.appbrewery.com/random";
                 URL apiUrl = new URL(apiUrl2);
@@ -111,22 +144,21 @@ public class MainActivity extends AppCompatActivity {
                     String line;
                     while ((line = reader.readLine()) != null) {
                         responseBuilder.append(line);
-                        System.out.println(line);
                     }
                     responseBody = responseBuilder.toString();
+                    System.out.println("Response from API : " + responseBody);
                 } else {
-                    Log.e(TAG, "Failed to fetch data: " + responseCode);
-                    return null;
+                    Log.e(TAG, "Failed to fetch data from api: " + responseCode);
+                    return responseBody;
                 }
             } catch (IOException e) {
                 Log.e(TAG, "Error: " + e.getMessage(), e);
-                return null;
+                return responseBody;
             } finally {
                 if (connection != null) {
                     connection.disconnect();
                 }
             }
-
             return responseBody;
         }
 
@@ -135,6 +167,7 @@ public class MainActivity extends AppCompatActivity {
             if (result != null) {
                 parseAndDisplayResult(result);
             } else {
+
                 postErrorToUi();
             }
         }
@@ -143,12 +176,11 @@ public class MainActivity extends AppCompatActivity {
     private void fetchDataFromApi() {
         new FetchDataTask().execute();
     }
-
-
         private void parseAndDisplayResult(String result) {
             try {
                 JSONObject json = new JSONObject(result);
                 final String activit = json.getString("activity");
+                System.out.println(activit);
                 final String typeo = json.getString("type");
                 final String parti = json.getString("participants");
                 String price = json.getString("price");
@@ -156,10 +188,11 @@ public class MainActivity extends AppCompatActivity {
                 priceInt *= 1500;
                 final String finalPrice = "₹" + priceInt;
 
-                String acc = json.getString("accessibility");
+                final String acc = json.getString("accessibility");
 
                 mainHandler.post(() -> {
                     mTextView.setText(activit);
+                    activity = activit;
                     mTextView1.setText(typeo);
                     mTextView2.setText(parti);
                     mTextView3.setText(finalPrice);
